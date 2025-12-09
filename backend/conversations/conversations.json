@@ -1,0 +1,84 @@
+{
+  "56d95686-7ee3-4bfd-b96a-89fa7d79553e": {
+    "id": "56d95686-7ee3-4bfd-b96a-89fa7d79553e",
+    "title": "\u201cMy device is BT 2.0 and won\u2019t accept 0000; what e...",
+    "created_at": "2025-12-09T08:19:05.100000",
+    "updated_at": "2025-12-09T08:22:21.036705",
+    "messages": [
+      {
+        "role": "user",
+        "content": "\u201cMy device is BT 2.0 and won\u2019t accept 0000; what else can I try?\u201d",
+        "timestamp": "2025-12-09T08:19:10.338570",
+        "has_mindmap": false,
+        "mermaid_code": null,
+        "sources": null
+      },
+      {
+        "role": "assistant",
+        "content": "Empty Response",
+        "timestamp": "2025-12-09T08:19:11.151695",
+        "has_mindmap": false,
+        "mermaid_code": null,
+        "sources": []
+      },
+      {
+        "role": "user",
+        "content": "\u201cMy device is BT 2.0 and won\u2019t accept 0000; what else can I try?\u201d",
+        "timestamp": "2025-12-09T08:22:13.525956",
+        "has_mindmap": false,
+        "mermaid_code": null,
+        "sources": null
+      },
+      {
+        "role": "assistant",
+        "content": "If you are experiencing difficulty pairing your headphones, even if the required password is not accepted, you should follow these general pairing troubleshooting steps:\n\n1.  Ensure that the Bluetooth feature is enabled on your Bluetooth device and that the device is turned on before you turn on the headset.\n2.  Place both earpieces into the charging box.\n3.  Confirm that the Bluetooth function is disabled on any Bluetooth devices that were previously connected to the headset.\n4.  On your Bluetooth device, remove the entry \"Philips TAT3216\" from the Bluetooth list.\n5.  If pairing still does not work, refer to the instructions for a \"Factory reset the headset.\"",
+        "timestamp": "2025-12-09T08:22:21.036660",
+        "has_mindmap": false,
+        "mermaid_code": null,
+        "sources": [
+          "8831aab4-5008-45b9-b4c7-fd1902f5b6c7.pdf",
+          "d1124b03-e8f6-4ffc-aa8f-b8e1f0b0e0c9.pdf",
+          "4d7c57ff-2dcc-4b41-8cae-c006579b1f9f.pdf",
+          "0c42be5c-86b9-4597-a050-ffabe5414d49.pdf",
+          "5eabe279-3240-44c2-9234-471db6a821e5.pdf",
+          "96210912-0116-4ea4-bdf8-ed5563575593.pdf"
+        ]
+      }
+    ],
+    "document_ids": [
+      "8831aab4-5008-45b9-b4c7-fd1902f5b6c7"
+    ]
+  },
+  "568b7aca-4700-4e5c-aefe-16b1f5374f4f": {
+    "id": "568b7aca-4700-4e5c-aefe-16b1f5374f4f",
+    "title": "New Chat",
+    "created_at": "2025-12-09T09:16:13.104042",
+    "updated_at": "2025-12-09T09:16:13.104042",
+    "messages": [],
+    "document_ids": []
+  },
+  "bac77e1c-5c52-43a3-824d-1b7c0e26da20": {
+    "id": "bac77e1c-5c52-43a3-824d-1b7c0e26da20",
+    "title": "New Chat",
+    "created_at": "2025-12-09T09:16:13.104906",
+    "updated_at": "2025-12-09T09:16:13.104906",
+    "messages": [],
+    "document_ids": []
+  },
+  "5a1919cc-c779-407d-a6ca-1ee95408e970": {
+    "id": "5a1919cc-c779-407d-a6ca-1ee95408e970",
+    "title": "New Chat",
+    "created_at": "2025-12-09T09:16:16.074104",
+    "updated_at": "2025-12-09T09:16:16.074104",
+    "messages": [],
+    "document_ids": []
+  },
+  "2a3edb78-942d-44cf-b3db-0634b645ab01": {
+    "id": "2a3edb78-942d-44cf-b3db-0634b645ab01",
+    "title": "New Chat",
+    "created_at": "2025-12-09T09:16:16.076452",
+    "updated_at": "2025-12-09T09:16:16.076452",
+    "messages": [],
+    "document_ids": []
+  }
+}

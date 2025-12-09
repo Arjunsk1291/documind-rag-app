@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+llama-index-core
+llama-index-vector-stores-pinecone
+llama-index-embeddings-gemini
+llama-index-llms-gemini
+pinecone-client
+python-dotenv
+PyMuPDF
+pymupdf4llm
+python-docx
+aiofiles
+google-generativeai
