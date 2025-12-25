@@ -1,278 +1,111 @@
-# DocuMind - RAG Document Assistant
+# 🚀 DocuMind - Advanced CAD Analysis RAG System
 
-A modern RAG (Retrieval-Augmented Generation) document assistant built with React and FastAPI.
+AI-powered document assistant with advanced multi-model CAD drawing analysis.
 
-## Features
+## ✨ Features
 
-- 📄 Document Upload & Management (PDF, DOCX, TXT, MD)
-- 💬 Intelligent Chat Interface
-- 🧠 Mind Map Visualization with Mermaid.js
-- 🎨 Modern Dark UI
-- 🔄 Real-time Updates
+- 📄 **Multi-format Support**: PDF, DOCX, DXF, DWG, STL, and more
+- 🤖 **6 AI Models**: Choose from Gemini and OpenRouter models
+- 🔍 **5-Stage CAD Analysis**: Comprehensive technical analysis
+- 💬 **RAG Chat**: Context-aware Q&A with your documents
+- 🎨 **CAD Viewer**: Interactive SVG/PNG rendering
+- 🧠 **Mind Maps**: Auto-generate Mermaid diagrams
+- 🌓 **Dark Mode**: Beautiful UI with theme switching
 
-## Project Structure
+## 🏗️ Architecture
 ```
-documind-rag-app/
-├── src/
-│   ├── components/          # React components
-│   │   ├── ChatArea.jsx
-│   │   ├── ChatInput.jsx
-│   │   ├── ChatMessage.jsx
-│   │   ├── DocumentList.jsx
-│   │   ├── DocumentUpload.jsx
-│   │   ├── MainContent.jsx
-│   │   ├── MindMapModal.jsx
-│   │   ├── Sidebar.jsx
-│   │   └── WelcomeScreen.jsx
-│   ├── hooks/              # Custom React hooks
-│   │   ├── useChat.js
-│   │   └── useDocuments.js
-│   ├── services/           # API services
-│   │   └── api.js
-│   ├── utils/              # Utility functions
-│   │   └── mermaid.js
-│   ├── App.jsx             # Main app component
-│   ├── main.jsx            # Entry point
-│   └── index.css           # Global styles
-├── public/                 # Static assets
-├── .env.example           # Environment variables template
-├── .gitignore            # Git ignore rules
-├── package.json          # Dependencies
-├── tailwind.config.js    # Tailwind configuration
-├── vite.config.js        # Vite configuration
-└── README.md             # This file
+Frontend (React + Vite) ← REST API → Backend (FastAPI)
+                                          ↓
+                            ┌─────────────┴─────────────┐
+                            ↓                           ↓
+                    Pinecone Vector DB          Google Gemini / OpenRouter
 ```
 
-## Installation
+## 🚀 Quick Start
 
-1. **Clone the repository**
+### Backend Setup
 ```bash
-   git clone <your-repo-url>
-   cd documind-rag-app
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure .env
+cp .env.example .env
+# Add your API keys
+
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-2. **Install dependencies**
+### Frontend Setup
 ```bash
-   npm install
-```
-
-3. **Create environment file**
-```bash
-   cp .env.example .env
-```
-
-4. **Update `.env` with your backend API URL**
-```
-   VITE_API_URL=http://localhost:8000/api
-```
-
-## Development
-
-Start the development server:
-```bash
+npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`
+Visit: http://localhost:5173
 
-## Build for Production
-```bash
-npm run build
-```
+## 🔑 Required API Keys
 
-The built files will be in the `dist/` directory.
+- **Google AI Studio**: https://aistudio.google.com/apikey
+- **Pinecone**: https://www.pinecone.io/
+- **OpenRouter** (optional): https://openrouter.ai/
 
-## Preview Production Build
-```bash
-npm run preview
-```
+## 📊 AI Models
 
-## Environment Variables
+| Model | Provider | Free | Capabilities |
+|-------|----------|------|--------------|
+| Gemini 2.5 Flash | Google | ✅ | Vision, Fast, 1M context |
+| Gemini 2.5 Pro | Google | ❌ | Vision, Reasoning, 2M context |
+| Xiaomi MiMo V2 | OpenRouter | ✅ | Vision, Multimodal |
+| DeepSeek R1 | OpenRouter | ❌ | Reasoning, Chain-of-thought |
+| NVIDIA Nemotron | OpenRouter | ✅ | Vision, Technical diagrams |
+| Qwen 3 235B | OpenRouter | ❌ | Large-scale, Advanced |
 
-- `VITE_API_URL` - Backend API URL (default: `http://localhost:8000/api`)
-- `VITE_ENV` - Environment mode (development/production)
+## 🎯 Advanced CAD Analysis
 
-## Backend API Integration
+1. Upload a DXF/DWG file
+2. Create a new chat
+3. Click the **Advanced CAD Analysis** button (purple sparkles ✨)
+4. Wait 1-2 minutes for comprehensive 5-stage analysis
 
-This frontend is designed to work with a FastAPI backend. Update the following files to connect to your backend:
+### Analysis Stages
 
-### API Endpoints Expected:
+1. **Overview**: Type, purpose, complexity assessment
+2. **Technical**: Dimensions, line types, annotations, standards
+3. **Components**: Inventory, features, materials, assemblies
+4. **Measurements**: All dimensions, tolerances, specifications
+5. **Quality**: Clarity rating, completeness, recommendations
 
-1. **Upload Document**
-   - `POST /api/documents/upload`
-   - Body: `multipart/form-data` with file
+## 📝 Tech Stack
 
-2. **Get Documents**
-   - `GET /api/documents`
-   - Response: Array of document objects
+**Backend:**
+- FastAPI
+- LlamaIndex
+- Pinecone
+- Google Gemini API
+- OpenRouter API
+- ezdxf (CAD parsing)
 
-3. **Delete Document**
-   - `DELETE /api/documents/{documentId}`
+**Frontend:**
+- React 18
+- Vite
+- Tailwind CSS
+- Axios
+- Lucide Icons
+- Mermaid.js
 
-4. **Send Chat Message**
-   - `POST /api/chat`
-   - Body: `{ query: string, documentIds: string[] }`
+## 🤝 Contributing
 
-5. **Generate Mind Map**
-   - `POST /api/mindmap`
-   - Body: `{ query: string, documentIds: string[] }`
+Contributions welcome! Please open an issue first to discuss changes.
 
-### Connecting to Backend:
+## 📄 License
 
-In `src/services/api.js`, uncomment the actual API calls and remove the simulated delays:
-```javascript
-// Example: Replace simulation in useDocuments.js
-export const uploadDocument = async (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const response = await api.post('/documents/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-  
-  return response.data;
-};
-```
+MIT License - See LICENSE file for details
 
-## Component Architecture
+## 🙏 Acknowledgments
 
-### Core Components:
-
-- **App.jsx** - Root component managing global state
-- **Sidebar.jsx** - Document management sidebar
-- **MainContent.jsx** - Main chat and content area
-- **MindMapModal.jsx** - Full-screen mind map viewer
-
-### UI Components:
-
-- **DocumentUpload.jsx** - File upload interface
-- **DocumentList.jsx** - List of uploaded documents
-- **WelcomeScreen.jsx** - Initial welcome view
-- **ChatArea.jsx** - Message display area
-- **ChatInput.jsx** - User input interface
-- **ChatMessage.jsx** - Individual message component
-
-### Custom Hooks:
-
-- **useDocuments.js** - Document management logic
-- **useChat.js** - Chat functionality and state
-
-### Services:
-
-- **api.js** - Axios instance and API methods
-
-### Utils:
-
-- **mermaid.js** - Mermaid diagram initialization and rendering
-
-## Styling
-
-This project uses:
-- **Tailwind CSS** for utility-first styling
-- **Lucide React** for icons
-- Custom color palette (dark theme with blue accents)
-
-## Technologies Used
-
-- **React 18** - UI library
-- **Vite** - Build tool and dev server
-- **Tailwind CSS** - Styling
-- **Axios** - HTTP client
-- **Mermaid.js** - Diagram rendering
-- **Lucide React** - Icon library
-
-## Git Workflow
-```bash
-# Initialize git repository
-git init
-
-# Add all files
-git add .
-
-# Commit
-git commit -m "Initial commit: DocuMind RAG Assistant"
-
-# Add remote
-git remote add origin <your-repo-url>
-
-# Push to main branch
-git push -u origin main
-```
-
-## Customization Guide
-
-### Changing Colors:
-
-Edit `tailwind.config.js`:
-```javascript
-theme: {
-  extend: {
-    colors: {
-      primary: '#your-color',
-      secondary: '#your-color',
-    }
-  }
-}
-```
-
-### Adding New Components:
-
-1. Create component in `src/components/`
-2. Import and use in parent component
-3. Update props and state as needed
-
-### Modifying API Endpoints:
-
-Edit `src/services/api.js` to match your backend routes.
-
-## Troubleshooting
-
-### Port Already in Use:
-```bash
-# Kill process on port 5173
-sudo lsof -t -i:5173 | xargs kill -9
-```
-
-### Build Errors:
-```bash
-# Clear cache and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Mermaid Diagrams Not Rendering:
-- Check browser console for errors
-- Ensure Mermaid syntax is correct
-- Verify `mermaid` package is installed
-
-## License
-
-MIT
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## Support
-
-For issues and questions, please open an issue on GitHub.
-
-## Roadmap
-
-- [ ] Add document preview functionality
-- [ ] Implement real-time collaboration
-- [ ] Add more visualization types
-- [ ] Support for more document formats
-- [ ] Export chat history
-- [ ] Dark/Light theme toggle
-- [ ] Multi-language support
-
-## Credits
-
-Built with ❤️ using React and FastAPI
+- Google Gemini for advanced AI capabilities
+- OpenRouter for model diversity
+- Pinecone for vector storage
+- ezdxf for CAD file parsing
