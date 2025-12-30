@@ -11,16 +11,9 @@ class DocumentUploadResponse(BaseModel):
     message: str = "Document uploaded and indexed successfully"
 
 class ChatRequest(BaseModel):
-    query: Optional[str] = Field(None, min_length=1, max_length=1000)  # Optional for compatibility
-    message: Optional[str] = Field(None, min_length=1, max_length=1000)  # New field name
+    query: str = Field(..., min_length=1, max_length=1000)
     document_ids: Optional[List[str]] = None
     conversation_history: Optional[List[dict]] = None
-    model: Optional[str] = None  # Allow model selection
-    
-    @property
-    def get_query(self) -> str:
-        """Get query from either 'query' or 'message' field"""
-        return self.message or self.query or ""
 
 class ChatResponse(BaseModel):
     response: str

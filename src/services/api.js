@@ -7,7 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 180000,
+  timeout: 180000, // 3 minutes
 });
 
 // Helper function to transform snake_case to camelCase
@@ -121,16 +121,48 @@ export const generateMindMap = async (conversationId, query, documentIds = []) =
   return transformed;
 };
 
-export const runAdvancedAnalysis = async (conversationId, query, documentIds = []) => {
-  console.log('API: Running advanced CAD analysis for conversation:', conversationId);
-  const response = await api.post(`/conversations/${conversationId}/advanced-analysis`, {
-    query,
+// ============= AI ANALYSIS =============
+
+export const runAdvancedAnalysis = async (conversationId, query, documentIds = [], modelId = null) => {
+  console.log('API: Running advanced vision analysis for conversation:', conversationId);
+  const payload = {
+    message: query,
     document_ids: documentIds
-  });
+  };
+  
+  if (modelId) {
+    payload.model = modelId;
+  }
+  
+  const response = await api.post(`/conversations/${conversationId}/advanced-analysis`, payload);
   
   const transformed = transformResponse(response.data);
   console.log('API: Advanced analysis response:', transformed);
   return transformed;
+};
+
+export const runHybridAnalysis = async (conversationId, query, documentIds = [], modelId = null) => {
+  console.log('API: Running hybrid CV+AI analysis for conversation:', conversationId);
+  const payload = {
+    message: query,
+    document_ids: documentIds
+  };
+  
+  if (modelId) {
+    payload.model = modelId;
+  }
+  
+  const response = await api.post(`/conversations/${conversationId}/hybrid-analysis`, payload);
+  
+  const transformed = transformResponse(response.data);
+  console.log('API: Hybrid analysis response:', transformed);
+  return transformed;
+};
+
+export const getAvailableModels = async () => {
+  console.log('API: Fetching available AI models');
+  const response = await api.get('/models');
+  return transformResponse(response.data);
 };
 
 export default api;
