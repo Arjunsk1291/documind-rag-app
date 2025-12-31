@@ -1,17 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Bot, ChevronDown } from 'lucide-react';
 
+// Available AI models - UPDATED WITH GOOGLE STUDIO GEMINI
 const AI_MODELS = {
   hybrid: [
-    { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', free: true, recommended: true, description: 'Best free model' },
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', free: true, recommended: true, description: 'Best free text model' },
     { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', free: true, description: 'Fast and efficient' },
     { id: 'openai/gpt-oss-20b:free', name: 'GPT OSS 20B', free: true, description: 'GPT-style model' },
     { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', free: false, description: 'Best reasoning (paid)' },
     { id: 'qwen/qwen3-235b-a22b', name: 'Qwen 3 235B', free: false, description: 'Large model (paid)' },
   ],
   vision: [
-    { id: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'NVIDIA Nemotron VL', free: true, recommended: true, description: 'Best free vision' },
-    { id: 'gemini-2.5-flash', name: 'Gemini Flash', free: true, description: 'Google vision (quota limited)' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', free: true, recommended: true, description: 'Best quality (auto-fallback to Lite)' },
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', free: true, description: 'Lighter, better for quota limits' },
+    { id: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'NVIDIA Nemotron VL', free: true, description: 'Technical diagrams' },
+    { id: 'qwen/qwen-2.5-vl-7b-instruct:free', name: 'Qwen 2.5 VL', free: true, description: 'Qwen vision model' },
   ]
 };
 
@@ -30,10 +33,6 @@ export default function ChatInput({
   const textareaRef = useRef(null);
   const modeMenuRef = useRef(null);
   const modelPickerRef = useRef(null);
-
-  useEffect(() => {
-    console.log('ChatInput mounted:', { hasCADDocuments, disabled, analysisMode });
-  }, [hasCADDocuments, disabled, analysisMode]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -58,8 +57,6 @@ export default function ChatInput({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
-      console.log('Submitting:', { analysisMode, selectedModel, hasCADDocuments });
-      
       if (analysisMode === 'vision' && hasCADDocuments) {
         onAdvancedAnalysis(message.trim(), selectedModel);
       } else if (analysisMode === 'hybrid' && hasCADDocuments) {
@@ -87,7 +84,6 @@ export default function ChatInput({
         return {
           label: 'Vision Analysis',
           icon: Sparkles,
-          color: 'purple',
           gradient: 'from-purple-600 to-purple-700',
           hoverGradient: 'hover:from-purple-700 hover:to-purple-800',
           bgLight: 'bg-purple-50 dark:bg-purple-900/20',
@@ -103,7 +99,6 @@ export default function ChatInput({
         return {
           label: 'Hybrid AI',
           icon: Bot,
-          color: 'blue',
           gradient: 'from-blue-600 to-blue-700',
           hoverGradient: 'hover:from-blue-700 hover:to-blue-800',
           bgLight: 'bg-blue-50 dark:bg-blue-900/20',
@@ -119,7 +114,6 @@ export default function ChatInput({
         return {
           label: 'Normal Chat',
           icon: Send,
-          color: 'blue',
           gradient: 'from-blue-600 to-blue-700',
           hoverGradient: 'hover:from-blue-700 hover:to-blue-800',
           bgLight: 'bg-white dark:bg-gray-700',
@@ -140,25 +134,20 @@ export default function ChatInput({
   const getModelDisplayName = () => {
     if (!selectedModel) return 'Auto';
     const model = [...AI_MODELS.hybrid, ...AI_MODELS.vision].find(m => m.id === selectedModel);
-    return model ? model.name.split(' ')[0] : 'Auto';
+    return model ? model.name.split(' ')[0] + (model.name.includes('Studio') ? ' Studio' : '') : 'Auto';
   };
 
-  const showModeSelector = true; // Always show for now
+  const showModeSelector = true;
 
   return (
     <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Mode Selector Row */}
         {showModeSelector && (
           <div className="mb-3 flex items-center gap-2 flex-wrap">
-            {/* Mode Button with Dropdown */}
             <div className="relative" ref={modeMenuRef}>
               <button
                 type="button"
-                onClick={() => {
-                  console.log('Mode button clicked, current showModeMenu:', showModeMenu);
-                  setShowModeMenu(!showModeMenu);
-                }}
+                onClick={() => setShowModeMenu(!showModeMenu)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg ${
                   analysisMode !== 'normal'
                     ? `${config.buttonBg} ${config.buttonText} border-2 ${config.buttonBorder}`
@@ -170,21 +159,12 @@ export default function ChatInput({
                 <ChevronDown className={`w-4 h-4 transition-transform ${showModeMenu ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Dropdown Menu - FIXED POSITIONING */}
               {showModeMenu && (
-                <div 
-                  className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700 z-[9999] overflow-hidden"
-                  style={{ maxHeight: '400px' }}
-                >
+                <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700 z-[9999] overflow-hidden">
                   <div className="p-1">
-                    {/* Normal Chat */}
                     <button
                       type="button"
-                      onClick={() => { 
-                        console.log('Selecting normal mode');
-                        setAnalysisMode('normal'); 
-                        setShowModeMenu(false); 
-                      }}
+                      onClick={() => { setAnalysisMode('normal'); setShowModeMenu(false); }}
                       className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all ${
                         analysisMode === 'normal' 
                           ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-500' 
@@ -197,59 +177,45 @@ export default function ChatInput({
                           Normal Chat
                           {analysisMode === 'normal' && <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">Active</span>}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Regular RAG query with documents</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Regular RAG query</div>
                       </div>
                     </button>
                     
-                    {/* Vision Analysis */}
                     <button
                       type="button"
-                      onClick={() => { 
-                        console.log('Selecting vision mode');
-                        setAnalysisMode('vision'); 
-                        setShowModeMenu(false); 
-                      }}
+                      onClick={() => { setAnalysisMode('vision'); setShowModeMenu(false); }}
                       className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all ${
                         analysisMode === 'vision' 
                           ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-500' 
                           : 'hover:bg-purple-50 dark:hover:bg-purple-900/20'
                       }`}
-                      disabled={!hasCADDocuments}
                     >
                       <Sparkles className="w-6 h-6 mt-0.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
                       <div className="flex-1 text-left">
                         <div className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                           Vision Analysis
                           {analysisMode === 'vision' && <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">Active</span>}
-                          {!hasCADDocuments && <span className="text-xs bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">No CAD</span>}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">5-stage vision AI analysis (if available)</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">5-stage vision AI</div>
                       </div>
                     </button>
                     
-                    {/* Hybrid AI */}
                     <button
                       type="button"
-                      onClick={() => { 
-                        console.log('Selecting hybrid mode');
-                        setAnalysisMode('hybrid'); 
-                        setShowModeMenu(false); 
-                      }}
+                      onClick={() => { setAnalysisMode('hybrid'); setShowModeMenu(false); }}
                       className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all ${
                         analysisMode === 'hybrid' 
                           ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-500' 
                           : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
                       }`}
-                      disabled={!hasCADDocuments}
                     >
                       <Bot className="w-6 h-6 mt-0.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                       <div className="flex-1 text-left">
                         <div className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                           Hybrid AI
                           {analysisMode === 'hybrid' && <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">Active</span>}
-                          {!hasCADDocuments && <span className="text-xs bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">No CAD</span>}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">CV extraction + AI models (works without vision)</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">CV + AI models</div>
                       </div>
                     </button>
                   </div>
@@ -257,7 +223,6 @@ export default function ChatInput({
               )}
             </div>
 
-            {/* Model Picker */}
             {analysisMode !== 'normal' && config.models.length > 0 && (
               <div className="relative" ref={modelPickerRef}>
                 <button
@@ -282,7 +247,7 @@ export default function ChatInput({
                             🎯 Auto-select
                             <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full font-normal">Recommended</span>
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Automatically picks best available model</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Best available model</div>
                         </div>
                       </button>
 
@@ -312,49 +277,46 @@ export default function ChatInput({
               </div>
             )}
 
-            {/* Status Badge */}
             {analysisMode !== 'normal' && (
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${config.buttonBg} ${config.buttonText}`}>
-                <Icon className="w-3 h-3" />
-                <span>{config.description}</span>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Input Area */}
-        <div className="flex gap-2">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              analysisMode === 'vision' 
-                ? "What would you like to analyze about this CAD?" 
-                : analysisMode === 'hybrid'
-                ? "Ask about CAD structure, components, or design..."
-                : "Ask a question about your documents..."
-            }
-            disabled={disabled}
-            rows={1}
-            className={`flex-1 resize-none rounded-lg border-2 px-4 py-3 focus:outline-none focus:ring-2 transition-all ${
-              config.border
-            } ${config.ring} ${config.bgLight} text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed`}
-            style={{ maxHeight: '200px', minHeight: '52px' }}
-          />
-          <button
-            type="submit"
-            disabled={disabled || !message.trim()}
-            className={`px-5 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl bg-gradient-to-r ${config.gradient} ${config.hoverGradient} text-white min-w-[100px] justify-center`}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="hidden sm:inline">
-              {analysisMode === 'normal' ? 'Send' : 'Analyze'}
-            </span>
-          </button>
-        </div>
-      </div>
-    </form>
-  );
+              <div className={`flex items-center gap-1.5 px-3py-1.5 rounded-lg text-xs font-medium ${config.buttonBg} ${config.buttonText}`}>
+<Icon className="w-3 h-3" />
+<span>{config.description}</span>
+</div>
+)}
+</div>
+)}
+    <div className="flex gap-2">
+      <textarea
+        ref={textareaRef}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={
+          analysisMode === 'vision' 
+            ? "What would you like to analyze?" 
+            : analysisMode === 'hybrid'
+            ? "Ask about CAD structure..."
+            : "Ask a question..."
+        }
+        disabled={disabled}
+        rows={1}
+        className={`flex-1 resize-none rounded-lg border-2 px-4 py-3 focus:outline-none focus:ring-2 transition-all ${
+          config.border
+        } ${config.ring} ${config.bgLight} text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+        style={{ maxHeight: '200px', minHeight: '52px' }}
+      />
+      <button
+        type="submit"
+        disabled={disabled || !message.trim()}
+        className={`px-5 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl bg-gradient-to-r ${config.gradient} ${config.hoverGradient} text-white min-w-[100px] justify-center`}
+      >
+        <Icon className="w-5 h-5" />
+        <span className="hidden sm:inline">
+          {analysisMode === 'normal' ? 'Send' : 'Analyze'}
+        </span>
+      </button>
+    </div>
+  </div>
+</form>
+);
 }

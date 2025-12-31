@@ -1,6 +1,7 @@
 """
 Multi-Model CAD Analyzer
-Extended with 6 additional free models for testing
+Supports Gemini (direct + OpenRouter) + other OpenRouter models
+Updated with gemini-2.5-flash and gemini-2.5-flash-lite fallback
 """
 
 import os
@@ -16,29 +17,41 @@ import google.generativeai as genai
 logger = logging.getLogger(__name__)
 
 class MultiModelCADAnalyzer:
-    """Advanced CAD analyzer with dual Gemini sources + OpenRouter models"""
+    """Advanced CAD analyzer with multiple Gemini fallbacks"""
     
     MODELS = {
-        # === PRIMARY GEMINI (with fallback) ===
+        # === GOOGLE STUDIO GEMINI (PRIMARY) ===
         "gemini-2.5-flash": {
             "name": "Gemini 2.5 Flash",
             "provider": "GEMINI_DIRECT",
-            "fallback_provider": "OPENROUTER",
-            "fallback_model": "google/gemini-2.0-flash-exp:free",
+            "fallback_provider": "GEMINI_DIRECT",
+            "fallback_model": "gemini-2.5-flash-lite",
             "capabilities": ["vision", "fast"],
             "context_window": "1M tokens",
             "free": True,
-            "notes": "Google AI Studio (with OpenRouter fallback)"
+            "notes": "Google AI Studio (recommended)",
+            "api_model": "gemini-2.5-flash"
         },
         
-        # === OPENROUTER GEMINI (backup) ===
+        # === GOOGLE STUDIO GEMINI LITE (FALLBACK) ===
+        "gemini-2.5-flash-lite": {
+            "name": "Gemini 2.5 Flash Lite",
+            "provider": "GEMINI_DIRECT",
+            "capabilities": ["vision", "fast", "lite"],
+            "context_window": "1M tokens",
+            "free": True,
+            "notes": "Lighter version, better for quota limits",
+            "api_model": "gemini-2.5-flash-lite"
+        },
+        
+        # === OPENROUTER GEMINI (SECONDARY FALLBACK) ===
         "google/gemini-2.0-flash-exp:free": {
             "name": "Gemini 2.0 Flash (OpenRouter)",
             "provider": "OPENROUTER",
             "capabilities": ["vision", "fast"],
             "context_window": "1M tokens",
             "free": True,
-            "notes": "OpenRouter fallback for quota issues"
+            "notes": "OpenRouter fallback (rate limited)"
         },
         
         # === VISION MODELS (FREE) ===
@@ -57,16 +70,7 @@ class MultiModelCADAnalyzer:
             "capabilities": ["vision", "fast"],
             "context_window": "32K tokens",
             "free": True,
-            "notes": "Qwen vision model, good for technical content"
-        },
-        
-        "xiaomi/mimo-v2-flash:free": {
-            "name": "Xiaomi MiMo V2 Flash",
-            "provider": "OPENROUTER",
-            "capabilities": ["vision", "fast"],
-            "context_window": "128K tokens",
-            "free": True,
-            "notes": "Fast multimodal model"
+            "notes": "Qwen vision model"
         },
         
         # === TEXT-ONLY MODELS (FREE) ===
@@ -76,7 +80,7 @@ class MultiModelCADAnalyzer:
             "capabilities": ["reasoning", "large_context"],
             "context_window": "128K tokens",
             "free": True,
-            "notes": "Large context, good for complex reasoning"
+            "notes": "Best free text model"
         },
         
         "google/gemma-3-27b-it:free": {
@@ -85,7 +89,7 @@ class MultiModelCADAnalyzer:
             "capabilities": ["reasoning", "fast"],
             "context_window": "8K tokens",
             "free": True,
-            "notes": "Fast Google model for quick analysis"
+            "notes": "Fast Google model"
         },
         
         "openai/gpt-oss-20b:free": {
@@ -94,7 +98,7 @@ class MultiModelCADAnalyzer:
             "capabilities": ["reasoning"],
             "context_window": "16K tokens",
             "free": True,
-            "notes": "Open source GPT-style model"
+            "notes": "Open source GPT-style"
         },
         
         # === TEXT-ONLY MODELS (PAID) ===
@@ -104,7 +108,7 @@ class MultiModelCADAnalyzer:
             "capabilities": ["reasoning", "advanced"],
             "context_window": "64K tokens",
             "free": False,
-            "notes": "Excellent reasoning, chain-of-thought"
+            "notes": "Excellent reasoning (paid)"
         },
         
         "qwen/qwen3-235b-a22b": {
@@ -113,7 +117,7 @@ class MultiModelCADAnalyzer:
             "capabilities": ["reasoning", "advanced"],
             "context_window": "32K tokens",
             "free": False,
-            "notes": "Large reasoning model"
+            "notes": "Large reasoning model (paid)"
         }
     }
     
@@ -122,32 +126,37 @@ class MultiModelCADAnalyzer:
         self.gemini_api_key = gemini_api_key or os.getenv('GOOGLE_API_KEY')
         self.openrouter_api_key = openrouter_api_key or os.getenv('OPENROUTER_API_KEY')
         
-        # Setup Google Studio Gemini (primary)
+        # Setup Google Studio Gemini models
         if self.gemini_api_key:
             try:
                 genai.configure(api_key=self.gemini_api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                logger.info("✅ Google Studio Gemini initialized")
+                self.gemini_models = {
+                    'gemini-2.5-flash': genai.GenerativeModel('gemini-2.5-flash'),
+                    'gemini-2.5-flash-lite': genai.GenerativeModel('gemini-2.5-flash-lite')
+                }
+                logger.info("✅ Google Studio Gemini models initialized")
             except Exception as e:
                 logger.warning(f"⚠️ Google Studio init failed: {e}")
-                self.gemini_model = None
+                self.gemini_models = {}
         else:
-            self.gemini_model = None
+            logger.warning("⚠️ No GOOGLE_API_KEY")
+            self.gemini_models = {}
         
         if not self.openrouter_api_key:
-            logger.warning("⚠️ No OPENROUTER_API_KEY")
+            logger.warning("⚠️ No OPENROUTER_API_KEY - OpenRouter fallback unavailable")
     
-    async def analyze_with_gemini_direct(self, image_bytes: Optional[bytes], prompt: str) -> str:
+    async def analyze_with_gemini_direct(self, image_bytes: Optional[bytes], prompt: str, model_name: str = 'gemini-2.5-flash') -> str:
         """Google Studio Gemini (PRIMARY)"""
-        if not self.gemini_model:
-            raise Exception("Google Studio Gemini not initialized")
+        if model_name not in self.gemini_models:
+            raise Exception(f"Gemini model {model_name} not initialized")
         
         try:
+            model = self.gemini_models[model_name]
             if image_bytes:
                 image = Image.open(io.BytesIO(image_bytes))
-                response = self.gemini_model.generate_content([prompt, image])
+                response = model.generate_content([prompt, image])
             else:
-                response = self.gemini_model.generate_content(prompt)
+                response = model.generate_content(prompt)
             return response.text
         except Exception as e:
             error_msg = str(e)
@@ -192,40 +201,60 @@ class MultiModelCADAnalyzer:
             raise Exception(f"OpenRouter failed: {e}")
     
     async def analyze_with_auto_fallback(self, image_bytes: Optional[bytes], prompt: str, model_id: str = "gemini-2.5-flash") -> tuple[str, str]:
-        """Smart analysis with automatic fallback"""
+        """Smart analysis with cascading fallback: Flash → Flash Lite → OpenRouter"""
         model_info = self.MODELS.get(model_id)
         if not model_info:
             raise ValueError(f"Unknown model: {model_id}")
         
-        # Primary Gemini with fallback
+        # GEMINI_DIRECT with cascading fallback
         if model_info['provider'] == 'GEMINI_DIRECT':
+            # Try primary model first
+            api_model = model_info.get('api_model', 'gemini-2.5-flash')
             try:
-                logger.info("🔵 Trying Google Studio Gemini...")
-                response = await self.analyze_with_gemini_direct(image_bytes, prompt)
-                logger.info("✅ Google Studio succeeded")
-                return response, "Google Studio Gemini"
-            except QuotaExceededError:
-                logger.warning("⚠️ Quota exceeded, using fallback...")
+                logger.info(f"🔵 Trying Google Studio {api_model}...")
+                response = await self.analyze_with_gemini_direct(image_bytes, prompt, api_model)
+                logger.info(f"✅ Google Studio {api_model} succeeded")
+                return response, f"Google Studio {api_model}"
+            except QuotaExceededError as e:
+                logger.warning(f"⚠️ {api_model} quota exceeded")
+                
+                # Try Gemini fallback (Flash Lite)
                 fallback_model = model_info.get('fallback_model')
-                if fallback_model and self.openrouter_api_key:
-                    response = await self.analyze_with_openrouter(image_bytes, prompt, fallback_model)
-                    return response, "OpenRouter Gemini (fallback)"
-                raise
+                if fallback_model and fallback_model in self.gemini_models:
+                    try:
+                        logger.info(f"🔄 Trying fallback: {fallback_model}...")
+                        response = await self.analyze_with_gemini_direct(image_bytes, prompt, fallback_model)
+                        logger.info(f"✅ Fallback {fallback_model} succeeded")
+                        return response, f"Google Studio {fallback_model} (fallback)"
+                    except QuotaExceededError:
+                        logger.warning(f"⚠️ {fallback_model} also quota exceeded")
+                    except Exception as e2:
+                        logger.error(f"❌ Fallback error: {e2}")
+                
+                # Last resort: Try OpenRouter if available
+                if self.openrouter_api_key:
+                    or_fallback = "google/gemini-2.0-flash-exp:free"
+                    try:
+                        logger.info("🔄 Last resort: OpenRouter Gemini...")
+                        response = await self.analyze_with_openrouter(image_bytes, prompt, or_fallback)
+                        return response, "OpenRouter Gemini (fallback)"
+                    except Exception as e3:
+                        logger.error(f"❌ OpenRouter fallback failed: {e3}")
+                
+                # All fallbacks exhausted
+                raise Exception("All Gemini sources exhausted (quota exceeded)")
+                
             except Exception as e:
                 logger.error(f"❌ Google Studio error: {e}")
-                fallback_model = model_info.get('fallback_model')
-                if fallback_model and self.openrouter_api_key:
-                    response = await self.analyze_with_openrouter(image_bytes, prompt, fallback_model)
-                    return response, "OpenRouter Gemini (fallback)"
                 raise
         
-        # Other models via OpenRouter
+        # For other models, use OpenRouter directly
         else:
             response = await self.analyze_with_openrouter(image_bytes, prompt, model_id)
             return response, model_info['name']
     
-    async def comprehensive_analysis(self, png_path: str, model_id: str = "nvidia/nemotron-nano-12b-v2-vl:free") -> Dict:
-        """Run comprehensive 5-stage CAD analysis with automatic fallback"""
+    async def comprehensive_analysis(self, png_path: str, model_id: str = "gemini-2.5-flash") -> Dict:
+        """Run comprehensive 5-stage CAD analysis with cascading fallback"""
         if not Path(png_path).exists():
             raise FileNotFoundError(f"PNG not found: {png_path}")
         
@@ -273,6 +302,7 @@ Technical: {results['stage_2_technical'][:200]}"""
     def format_for_rag(self, analysis_results: Dict) -> str:
         """Format for RAG indexing"""
         provider_note = f" via {analysis_results.get('provider_used', 'unknown')}"
+        
         return f"""CAD ANALYSIS ({analysis_results['model_used']}{provider_note})
 
 SUMMARY: {analysis_results['executive_summary']}

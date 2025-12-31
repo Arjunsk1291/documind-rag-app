@@ -421,7 +421,7 @@ async def run_advanced_analysis(conv_id: str, request: ChatRequest):
         query = request.get_query
         
         # Extract model selection
-        selected_model = request.model or 'nvidia/nemotron-nano-12b-v2-vl:free'
+        selected_model = request.model or 'gemini-2.0-flash-direct'
         
         # Check for CAD documents
         from app.services.document_service import document_service
