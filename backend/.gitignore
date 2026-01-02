@@ -76,4 +76,4 @@ backend/hybrid_analysis_results.json
 backend/test_analysis_results.json
 
 # Documentation
-docs/_build/
+docs/_build/conversations/
