@@ -13,7 +13,7 @@ export default function MainContent({ documents, currentConversation, onViewMind
   const conversationId = currentConversation?.id;
   const documentIds = currentConversation?.documentIds || [];
 
-  const { messages, setMessages, isLoading, sendMessage, sendAdvancedAnalysis, sendHybridAnalysis } = useChat(
+  const { messages, setMessages, isLoading, sendMessage, sendAdvancedAnalysis, sendVisionQuery, sendHybridAnalysis } = useChat(
     conversationId,
     documentIds
   );
@@ -37,7 +37,7 @@ export default function MainContent({ documents, currentConversation, onViewMind
     }
   }, [documentIds, documents]);
 
-  // Check if any active documents are CAD files - IMPROVED DETECTION
+  // Check if any active documents are CAD files
   const hasCADDocuments = activeDocuments.some(doc => {
     const fileName = (doc.name || doc.filename || '').toLowerCase();
     const isCadExtension = fileName.endsWith('.dxf') || 
@@ -45,20 +45,7 @@ export default function MainContent({ documents, currentConversation, onViewMind
                           fileName.endsWith('.dwf');
     const isCadFlag = doc.isCad || doc.is_cad;
     
-    console.log('CAD Check:', {
-      fileName,
-      isCadExtension,
-      isCadFlag,
-      result: isCadExtension || isCadFlag
-    });
-    
     return isCadExtension || isCadFlag;
-  });
-
-  console.log('MainContent State:', {
-    hasCADDocuments,
-    activeDocuments: activeDocuments.length,
-    documentNames: activeDocuments.map(d => d.name || d.filename)
   });
 
   if (!currentConversation) {
@@ -80,6 +67,7 @@ export default function MainContent({ documents, currentConversation, onViewMind
       <ChatInput 
         onSendMessage={sendMessage}
         onAdvancedAnalysis={sendAdvancedAnalysis}
+        onVisionQuery={sendVisionQuery}
         onHybridAnalysis={sendHybridAnalysis}
         disabled={isLoading}
         hasCADDocuments={hasCADDocuments}

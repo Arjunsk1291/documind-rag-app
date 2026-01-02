@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { sendMessage as apiSendMessage, runAdvancedAnalysis, runHybridAnalysis } from '../services/api';
+import { sendMessage as apiSendMessage, runAdvancedAnalysis, runHybridAnalysis, runVisionQuery } from '../services/api';
 
 export function useChat(conversationId, documentIds = []) {
   const [messages, setMessages] = useState([]);
@@ -49,7 +49,7 @@ export function useChat(conversationId, documentIds = []) {
 
     const userMessage = {
       role: 'user',
-      content: `✨ Advanced Vision Analysis: ${query}`,
+      content: `✨ Run 5-Stage Analysis: ${query}`,
       timestamp: new Date().toISOString()
     };
 
@@ -72,6 +72,43 @@ export function useChat(conversationId, documentIds = []) {
       const errorMessage = {
         role: 'assistant',
         content: `Sorry, there was an error running the advanced vision analysis. ${error.message || 'Please try again.'}`,
+        timestamp: new Date().toISOString(),
+        isError: true
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [conversationId, documentIds]);
+
+  const sendVisionQuery = useCallback(async (query) => {
+    if (!conversationId) return;
+
+    const userMessage = {
+      role: 'user',
+      content: query,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const response = await runVisionQuery(conversationId, query, documentIds);
+      
+      const assistantMessage = {
+        role: 'assistant',
+        content: response.message?.content || response.response,
+        timestamp: response.message?.timestamp || new Date().toISOString(),
+        sources: response.sources || []
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error running vision query:', error);
+      const errorMessage = {
+        role: 'assistant',
+        content: `Sorry, there was an error. ${error.response?.data?.detail || error.message || 'Please run 5-stage analysis first.'}`,
         timestamp: new Date().toISOString(),
         isError: true
       };
@@ -124,6 +161,7 @@ export function useChat(conversationId, documentIds = []) {
     isLoading,
     sendMessage,
     sendAdvancedAnalysis,
+    sendVisionQuery,
     sendHybridAnalysis
   };
 }

@@ -141,6 +141,20 @@ export const runAdvancedAnalysis = async (conversationId, query, documentIds = [
   return transformed;
 };
 
+export const runVisionQuery = async (conversationId, query, documentIds = []) => {
+  console.log('API: Running vision query with existing analysis for conversation:', conversationId);
+  const payload = {
+    message: query,
+    document_ids: documentIds
+  };
+  
+  const response = await api.post(`/conversations/${conversationId}/vision-query`, payload);
+  
+  const transformed = transformResponse(response.data);
+  console.log('API: Vision query response:', transformed);
+  return transformed;
+};
+
 export const runHybridAnalysis = async (conversationId, query, documentIds = [], modelId = null) => {
   console.log('API: Running hybrid CV+AI analysis for conversation:', conversationId);
   const payload = {

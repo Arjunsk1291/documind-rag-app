@@ -1,7 +1,6 @@
 """
-Multi-Model CAD Analyzer
-Supports Gemini (direct + OpenRouter) + other OpenRouter models
-Updated with gemini-2.5-flash and gemini-2.5-flash-lite fallback
+Multi-Model CAD Analyzer with Strict Vision Analysis Rules
+Enforces structured 5-stage analysis with NO repetition or invented data
 """
 
 import os
@@ -17,8 +16,27 @@ import google.generativeai as genai
 logger = logging.getLogger(__name__)
 
 class MultiModelCADAnalyzer:
-    """Advanced CAD analyzer with multiple Gemini fallbacks"""
+    """Advanced CAD analyzer with strict rule enforcement"""
     
+    # Master system prompt enforcing all rules
+    SYSTEM_PROMPT = """You are a technical CAD analysis expert. You MUST follow these rules STRICTLY:
+
+ABSOLUTE RULES (NON-NEGOTIABLE):
+1. Be CONCISE - Maximum 5-6 bullet points per stage
+2. NO repetition across stages - each stage covers DIFFERENT aspects
+3. NO invented data - if dimensions/standards are not visible, state "Not present in drawing"
+4. NO storytelling or teaching tone - declarative statements only
+5. NO "Based on the image..." prose - direct technical analysis only
+6. Assume reader is a professional engineer
+
+PROHIBITED:
+- Repeating the same information in different words
+- Adding extra sections beyond what's requested
+- Inventing measurements, tolerances, or standards
+- Using phrases like "Based on the analysis..." or "In conclusion..."
+
+If data is missing, state it ONCE and move on. Be technical, neutral, and precise."""
+
     MODELS = {
         # === GOOGLE STUDIO GEMINI (PRIMARY) ===
         "gemini-2.5-flash": {
@@ -152,11 +170,14 @@ class MultiModelCADAnalyzer:
         
         try:
             model = self.gemini_models[model_name]
+            # Prepend system prompt
+            full_prompt = f"{self.SYSTEM_PROMPT}\n\n{prompt}"
+            
             if image_bytes:
                 image = Image.open(io.BytesIO(image_bytes))
-                response = model.generate_content([prompt, image])
+                response = model.generate_content([full_prompt, image])
             else:
-                response = model.generate_content(prompt)
+                response = model.generate_content(full_prompt)
             return response.text
         except Exception as e:
             error_msg = str(e)
@@ -179,11 +200,11 @@ class MultiModelCADAnalyzer:
             if image_bytes:
                 base64_image = base64.b64encode(image_bytes).decode('utf-8')
                 message_content = [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": f"{self.SYSTEM_PROMPT}\n\n{prompt}"},
                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
                 ]
             else:
-                message_content = prompt
+                message_content = f"{self.SYSTEM_PROMPT}\n\n{prompt}"
             
             payload = {
                 "model": model_id,
@@ -254,7 +275,12 @@ class MultiModelCADAnalyzer:
             return response, model_info['name']
     
     async def comprehensive_analysis(self, png_path: str, model_id: str = "gemini-2.5-flash") -> Dict:
-        """Run comprehensive 5-stage CAD analysis with cascading fallback"""
+        """
+        Run comprehensive 5-stage CAD analysis with STRICT RULE ENFORCEMENT
+        
+        CRITICAL: This analysis runs ONCE per document when Vision Analysis is triggered.
+        Follow-up questions must reference this analysis, NOT regenerate it.
+        """
         if not Path(png_path).exists():
             raise FileNotFoundError(f"PNG not found: {png_path}")
         
@@ -262,18 +288,71 @@ class MultiModelCADAnalyzer:
         if not model_info or 'vision' not in model_info['capabilities']:
             raise ValueError(f"Model {model_id} doesn't support vision")
         
-        logger.info(f"🔍 5-stage analysis with {model_info['name']}...")
+        logger.info(f"🔍 5-stage STRICT analysis with {model_info['name']}...")
         
         with open(png_path, 'rb') as f:
             image_bytes = f.read()
         
         provider_used = None
+        
+        # STRICT 5-STAGE PROMPTS (NO DEVIATION ALLOWED)
         stages = {
-            "stage_1_overview": "Analyze this CAD: 1) type 2) purpose 3) complexity 4) key features",
-            "stage_2_technical": "Technical aspects: 1) dimensions 2) standards 3) annotations 4) units",
-            "stage_3_components": "Components: 1) major parts 2) relationships 3) materials 4) features",
-            "stage_4_measurements": "Measurements: 1) critical dims 2) tolerances 3) angles 4) constraints",
-            "stage_5_quality": "Quality: 1) clarity 2) completeness 3) issues 4) recommendations"
+            "stage_1_identification": """STAGE 1 — DOCUMENT IDENTIFICATION
+
+Analyze this CAD drawing and provide ONLY these 4 items (5-6 bullets MAX):
+1. Drawing type (e.g., Block Diagram, Wiring Diagram, Floor Plan, Schematic)
+2. Discipline (e.g., CCTV, Electrical, Telecom, Mechanical, Architectural)
+3. 2D or 3D representation
+4. Diagram intent (logical / physical / schematic / installation)
+
+FORMAT: Use bullet points. Be concise. No explanations.""",
+
+            "stage_2_system_overview": """STAGE 2 — SYSTEM OVERVIEW
+
+Analyze the systems and connections. Provide ONLY:
+1. What systems are present (list major systems only)
+2. How they are logically connected (high-level flow)
+3. Data/signal flow direction (if applicable)
+4. Central nodes or hubs (if any)
+
+FORMAT: Short paragraphs or bullets. NO repetition of Stage 1 info.""",
+
+            "stage_3_components": """STAGE 3 — COMPONENT BREAKDOWN
+
+List major components GROUPED BY SYSTEM. Do NOT:
+- List every single component exhaustively
+- Invent specifications not visible in the drawing
+- Repeat information from previous stages
+
+FORMAT: Grouped bullets only. Example:
+- System A: Component 1, Component 2
+- System B: Component 3, Component 4""",
+
+            "stage_4_technical": """STAGE 4 — TECHNICAL CHARACTERISTICS
+
+Provide ONLY these technical facts (declarative statements):
+1. Complexity level (Low / Moderate / High) - based on density and interconnections
+2. Scale indication (To-scale / Not-to-scale / Unknown)
+3. Dimensions present? (Yes/No - do NOT invent values)
+4. Tolerances present? (Yes/No)
+5. Standards referenced? (Yes/No - if yes, which ones are VISIBLE)
+6. Diagram type implications (e.g., "Logical diagram - not for installation")
+
+If data is NOT present, state "Not present in drawing" ONCE.""",
+
+            "stage_5_quality": """STAGE 5 — QUALITY & USABILITY ASSESSMENT
+
+Assess practical usability:
+1. Readability (Good / Fair / Poor - based on clarity, legibility)
+2. Layout efficiency (Logical flow / Cluttered / Well-organized)
+3. Information density (Appropriate / Too dense / Too sparse)
+4. Practical usability for engineering tasks
+
+Then provide:
+- 2-3 CONCRETE issues (specific problems)
+- 2-3 ACTIONABLE recommendations (specific improvements)
+
+NO vague statements. Be specific."""
         }
         
         results = {}
@@ -284,38 +363,45 @@ class MultiModelCADAnalyzer:
             if not provider_used:
                 provider_used = used_provider
         
-        logger.info("  Executive summary...")
-        summary_prompt = f"""Summarize in 2-3 sentences:
-Overview: {results['stage_1_overview'][:200]}
-Technical: {results['stage_2_technical'][:200]}"""
-        
-        summary, _ = await self.analyze_with_auto_fallback(None, summary_prompt, model_id)
+        # NO EXECUTIVE SUMMARY - This would violate "no second summary" rule
+        # The 5 stages ARE the complete analysis
         
         return {
             "model_used": model_info['name'],
             "model_id": model_id,
             "provider_used": provider_used,
-            "executive_summary": summary,
+            "analysis_complete": True,
             **results
         }
     
     def format_for_rag(self, analysis_results: Dict) -> str:
-        """Format for RAG indexing"""
+        """
+        Format 5-stage analysis for RAG indexing
+        Maintains strict structure without repetition
+        """
         provider_note = f" via {analysis_results.get('provider_used', 'unknown')}"
         
-        return f"""CAD ANALYSIS ({analysis_results['model_used']}{provider_note})
+        formatted = f"""# CAD VISION ANALYSIS ({analysis_results['model_used']}{provider_note})
 
-SUMMARY: {analysis_results['executive_summary']}
+## STAGE 1 — DOCUMENT IDENTIFICATION
+{analysis_results.get('stage_1_identification', 'N/A')}
 
-OVERVIEW: {analysis_results['stage_1_overview']}
+## STAGE 2 — SYSTEM OVERVIEW
+{analysis_results.get('stage_2_system_overview', 'N/A')}
 
-TECHNICAL: {analysis_results['stage_2_technical']}
+## STAGE 3 — COMPONENT BREAKDOWN
+{analysis_results.get('stage_3_components', 'N/A')}
 
-COMPONENTS: {analysis_results['stage_3_components']}
+## STAGE 4 — TECHNICAL CHARACTERISTICS
+{analysis_results.get('stage_4_technical', 'N/A')}
 
-MEASUREMENTS: {analysis_results['stage_4_measurements']}
+## STAGE 5 — QUALITY & USABILITY ASSESSMENT
+{analysis_results.get('stage_5_quality', 'N/A')}
 
-QUALITY: {analysis_results['stage_5_quality']}"""
+---
+Analysis completed in 5 stages. For follow-up questions, reference the above stages."""
+        
+        return formatted
 
 class QuotaExceededError(Exception):
     """Raised when API quota is exceeded"""

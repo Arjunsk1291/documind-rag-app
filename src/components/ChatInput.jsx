@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Bot, ChevronDown } from 'lucide-react';
+import { Send, Sparkles, Bot, ChevronDown, Play } from 'lucide-react';
 
-// Available AI models - UPDATED WITH GOOGLE STUDIO GEMINI
+// Available AI models
 const AI_MODELS = {
   hybrid: [
     { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', free: true, recommended: true, description: 'Best free text model' },
@@ -20,7 +20,8 @@ const AI_MODELS = {
 
 export default function ChatInput({ 
   onSendMessage, 
-  onAdvancedAnalysis, 
+  onAdvancedAnalysis,
+  onVisionQuery,
   onHybridAnalysis,
   disabled, 
   hasCADDocuments 
@@ -54,11 +55,25 @@ export default function ChatInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleRunAnalysis = () => {
+    const query = message.trim() || "Analyze this CAD drawing";
+    if (analysisMode === 'vision' && hasCADDocuments) {
+      onAdvancedAnalysis(query, selectedModel);
+    } else if (analysisMode === 'hybrid' && hasCADDocuments) {
+      onHybridAnalysis(query, selectedModel);
+    }
+    setMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
       if (analysisMode === 'vision' && hasCADDocuments) {
-        onAdvancedAnalysis(message.trim(), selectedModel);
+        // Use vision query endpoint (uses existing analysis)
+        onVisionQuery(message.trim());
       } else if (analysisMode === 'hybrid' && hasCADDocuments) {
         onHybridAnalysis(message.trim(), selectedModel);
       } else {
@@ -277,46 +292,60 @@ export default function ChatInput({
               </div>
             )}
 
+            {/* RUN ANALYSIS BUTTON - Only show in vision/hybrid mode */}
+            {analysisMode !== 'normal' && hasCADDocuments && (
+              <button
+                type="button"
+                onClick={handleRunAnalysis}
+                disabled={disabled}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r ${config.gradient} ${config.hoverGradient} text-white border-2 border-transparent hover:border-white/20`}
+              >
+                <Play className="w-4 h-4" />
+                <span>Run {analysisMode === 'vision' ? '5-Stage' : 'Hybrid'} Analysis</span>
+              </button>
+            )}
+
             {analysisMode !== 'normal' && (
-              <div className={`flex items-center gap-1.5 px-3py-1.5 rounded-lg text-xs font-medium ${config.buttonBg} ${config.buttonText}`}>
-<Icon className="w-3 h-3" />
-<span>{config.description}</span>
-</div>
-)}
-</div>
-)}
-    <div className="flex gap-2">
-      <textarea
-        ref={textareaRef}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={
-          analysisMode === 'vision' 
-            ? "What would you like to analyze?" 
-            : analysisMode === 'hybrid'
-            ? "Ask about CAD structure..."
-            : "Ask a question..."
-        }
-        disabled={disabled}
-        rows={1}
-        className={`flex-1 resize-none rounded-lg border-2 px-4 py-3 focus:outline-none focus:ring-2 transition-all ${
-          config.border
-        } ${config.ring} ${config.bgLight} text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed`}
-        style={{ maxHeight: '200px', minHeight: '52px' }}
-      />
-      <button
-        type="submit"
-        disabled={disabled || !message.trim()}
-        className={`px-5 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl bg-gradient-to-r ${config.gradient} ${config.hoverGradient} text-white min-w-[100px] justify-center`}
-      >
-        <Icon className="w-5 h-5" />
-        <span className="hidden sm:inline">
-          {analysisMode === 'normal' ? 'Send' : 'Analyze'}
-        </span>
-      </button>
-    </div>
-  </div>
-</form>
-);
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${config.buttonBg} ${config.buttonText}`}>
+                <Icon className="w-3 h-3" />
+                <span>{config.description}</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="flex gap-2">
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              analysisMode === 'vision' 
+                ? "Ask about the analysis..." 
+                : analysisMode === 'hybrid'
+                ? "Ask about CAD structure..."
+                : "Ask a question..."
+            }
+            disabled={disabled}
+            rows={1}
+            className={`flex-1 resize-none rounded-lg border-2 px-4 py-3 focus:outline-none focus:ring-2 transition-all ${
+              config.border
+            } ${config.ring} ${config.bgLight} text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+            style={{ maxHeight: '200px', minHeight: '52px' }}
+          />
+          <button
+            type="submit"
+            disabled={disabled || !message.trim()}
+            className={`px-5 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl bg-gradient-to-r ${config.gradient} ${config.hoverGradient} text-white min-w-[100px] justify-center`}
+          >
+            <Icon className="w-5 h-5" />
+            <span className="hidden sm:inline">
+              {analysisMode === 'normal' ? 'Send' : 'Ask'}
+            </span>
+          </button>
+        </div>
+      </div>
+    </form>
+  );
 }

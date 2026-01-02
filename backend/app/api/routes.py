@@ -317,19 +317,34 @@ async def get_cad_manifest(doc_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/documents/{doc_id}/cad-render")
+@router.get("/documents/{doc_id}/cad-render")
 async def get_cad_render(doc_id: str):
     """Get SVG render of CAD file"""
     try:
         from pathlib import Path
         from fastapi.responses import FileResponse
         
-        svg_path = Path(f"cad_renders/{doc_id}.svg")
-        if svg_path.exists():
-            return FileResponse(svg_path, media_type="image/svg+xml")
-        else:
-            raise HTTPException(status_code=404, detail="Render not found")
+        # Try multiple possible filenames
+        possible_paths = [
+            Path(f"cad_renders/{doc_id}_render.svg"),  # New format
+            Path(f"cad_renders/{doc_id}.svg"),          # Old format
+        ]
+        
+        for svg_path in possible_paths:
+            if svg_path.exists():
+                return FileResponse(svg_path, media_type="image/svg+xml")
+        
+        # If no SVG found, check for PNG fallback
+        png_path = Path(f"cad_renders/{doc_id}_analysis.png")
+        if png_path.exists():
+            return FileResponse(png_path, media_type="image/png")
+        
+        raise HTTPException(status_code=404, detail=f"Render not found for document {doc_id}")
     except HTTPException:
         raise
+    except Exception as e:
+        logger.error(f"Error getting CAD render: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         logger.error(f"Error getting CAD render: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -536,14 +551,19 @@ async def run_advanced_analysis(conv_id: str, request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/conversations/{conv_id}/hybrid-analysis")
-async def run_hybrid_analysis(conv_id: str, request: ChatRequest):
+
+
+@router.post("/conversations/{conv_id}/vision-query")
+@router.post("/conversations/{conv_id}/vision-query")
+async def vision_query_with_context(conv_id: str, request: ChatRequest):
     """
-    Run hybrid CV+LLM analysis on CAD documents
-    Works with both vision and text-only models
+    Answer questions about CAD using BOTH:
+    1. Existing 5-stage analysis (from previous run)
+    2. Fresh vision model examination of the image
+    Then synthesizes both perspectives
     """
     try:
-        logger.info(f"🔬 Hybrid analysis request for conversation: {conv_id}")
+        logger.info(f"💬 Vision query (hybrid: saved analysis + fresh vision) for conversation: {conv_id}")
         
         conversation = conversation_service.get_conversation(conv_id)
         if not conversation:
@@ -552,6 +572,184 @@ async def run_hybrid_analysis(conv_id: str, request: ChatRequest):
         doc_ids = request.document_ids or conversation.document_ids
         if not doc_ids:
             raise HTTPException(status_code=400, detail="No documents selected")
+        
+        query = request.get_query
+        selected_model = request.model or 'gemini-2.5-flash'
+        
+        # Check for CAD documents
+        from app.services.document_service import document_service
+        cad_docs = []
+        for doc_id in doc_ids:
+            doc = document_service.get_document(doc_id)
+            if doc and doc.get('is_cad', False):
+                cad_docs.append(doc)
+        
+        if not cad_docs:
+            raise HTTPException(status_code=400, detail="No CAD documents selected")
+        
+        # Import multi-model analyzer
+        from app.cad.multi_model_analyzer import MultiModelCADAnalyzer
+        from app.core.config import get_settings
+        from pathlib import Path
+        import json
+        
+        settings = get_settings()
+        analyzer = MultiModelCADAnalyzer(
+            gemini_api_key=settings.GOOGLE_API_KEY,
+            openrouter_api_key=settings.OPENROUTER_API_KEY
+        )
+        
+        all_responses = []
+        
+        for doc in cad_docs:
+            doc_id = doc['id']
+            doc_name = doc['name']
+            
+            # PART 1: Load existing 5-stage analysis
+            analysis_path = Path(f"cad_manifests/{doc_id}_analysis.json")
+            saved_analysis = None
+            
+            if analysis_path.exists():
+                try:
+                    with open(analysis_path, 'r') as f:
+                        saved_analysis = json.load(f)
+                    logger.info(f"✅ Loaded existing analysis for {doc_name}")
+                except Exception as e:
+                    logger.error(f"Error loading analysis for {doc_id}: {e}")
+            
+            if not saved_analysis:
+                all_responses.append(f"⚠️ **{doc_name}**: No 5-stage analysis found. Please run analysis first.")
+                continue
+            
+            # PART 2: Re-examine image with vision model for this specific question
+            png_path = Path(f"cad_renders/{doc_id}_analysis.png")
+            
+            if not png_path.exists():
+                all_responses.append(f"⚠️ **{doc_name}**: Image not available for re-examination.")
+                continue
+            
+            try:
+                logger.info(f"🔍 Re-examining {doc_name} with vision model for: '{query}'")
+                
+                # Read the image
+                with open(png_path, 'rb') as f:
+                    image_bytes = f.read()
+                
+                # Create a focused prompt for this specific question
+                vision_prompt = f"""You are examining a CAD drawing to answer a specific question.
+
+QUESTION: {query}
+
+CONTEXT - You previously analyzed this drawing with these findings:
+- Document Type: {saved_analysis.get('stage_1_identification', 'N/A')[:200]}...
+- System Overview: {saved_analysis.get('stage_2_system_overview', 'N/A')[:200]}...
+
+Now, look at the image again and answer the question specifically. Focus on:
+1. What you can SEE in the image related to this question
+2. Any details that the initial analysis may have missed
+3. Specific visual evidence
+
+Be concise and direct. Reference specific visual elements."""
+
+                # Get fresh vision analysis
+                fresh_vision_response, model_used = await analyzer.analyze_with_auto_fallback(
+                    image_bytes, 
+                    vision_prompt, 
+                    selected_model
+                )
+                
+                logger.info(f"✅ Fresh vision analysis complete using {model_used}")
+                
+                # PART 3: Synthesize both perspectives
+                synthesis_prompt = f"""Synthesize these two analyses of the same CAD drawing to answer the question comprehensively:
+
+QUESTION: {query}
+
+INITIAL 5-STAGE ANALYSIS:
+{analyzer.format_for_rag(saved_analysis)}
+
+FRESH VISION EXAMINATION (focused on the question):
+{fresh_vision_response}
+
+Provide a comprehensive answer that:
+1. Combines insights from both analyses
+2. Highlights any NEW details found in fresh examination
+3. Notes if the analyses agree or reveal different aspects
+4. Gives a clear, definitive answer to the question
+
+Be concise but thorough."""
+
+                # Use RAG service for final synthesis
+                from app.services.rag_service import get_rag_service
+                rag_service = get_rag_service()
+                
+                result = rag_service.query(
+                    query_text=synthesis_prompt,
+                    doc_ids=doc_ids
+                )
+                
+                # Format the response
+                formatted_response = f"""# 📋 Analysis for {doc_name}
+
+## Your Question
+{query}
+
+## Comprehensive Answer
+{result["response"]}
+
+---
+**Sources Used:**
+- ✅ Initial 5-stage analysis (model: {saved_analysis.get('model_used', 'Unknown')})
+- ✅ Fresh vision examination (model: {model_used})
+- ✅ RAG synthesis with indexed documents
+"""
+                
+                all_responses.append(formatted_response)
+                
+            except Exception as e:
+                logger.error(f"Error in vision query for {doc_name}: {e}", exc_info=True)
+                all_responses.append(f"❌ **{doc_name}**: Vision query failed - {str(e)}")
+        
+        if not all_responses:
+            combined_response = "⚠️ No analyses could be completed."
+        else:
+            combined_response = "\n\n".join(all_responses)
+        
+        # Save to conversation
+        user_message = Message(
+            role="user",
+            content=f"💬 Vision Query: {query}",
+            timestamp=datetime.now().isoformat()
+        )
+        conversation_service.add_message(conv_id, user_message)
+        
+        assistant_message = Message(
+            role="assistant",
+            content=combined_response,
+            timestamp=datetime.now().isoformat(),
+            has_mindmap=False,
+            mermaid_code=None,
+            sources=[]
+        )
+        conversation_service.add_message(conv_id, assistant_message, auto_title=False)
+        
+        return {
+            "conversation_id": conv_id,
+            "message": {
+                "role": "assistant",
+                "content": combined_response,
+                "timestamp": assistant_message.timestamp
+            },
+            "response": combined_response,
+            "sources": [],
+            "timestamp": assistant_message.timestamp
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in vision query: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
         
         # Get query
         query = request.get_query
