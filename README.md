@@ -233,28 +233,7 @@ MODELS = {
 - **Lucide React** - Icons
 - **Mermaid** - Diagrams
 
-## 🤝 Contributing
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🙏 Acknowledgments
-
-- Google Gemini for AI capabilities
-- OpenRouter for model access
-- Pinecone for vector search
-- Anthropic Claude for development assistance
-
-## 📧 Contact
-
-For questions or support, please open an issue on GitHub.
 
 ---
 
