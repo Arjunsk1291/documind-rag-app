@@ -501,6 +501,16 @@ async def run_advanced_analysis(conv_id: str, request: ChatRequest):
 
 {analyzer.format_for_rag(analysis_results)}
 """
+                
+                # Index CAD analysis into unified RAG system
+                try:
+                    logger.info(f"📊 Indexing CAD analysis into RAG system...")
+                    rag_service = get_rag_service()
+                    rag_service.index_cad_analysis(doc_id, analysis_results, doc_name)
+                    logger.info(f"✅ CAD analysis indexed successfully")
+                except Exception as idx_error:
+                    logger.error(f"⚠️ Failed to index CAD analysis: {idx_error}")
+                    # Continue even if indexing fails
                 all_analyses.append(formatted)
                 
             except Exception as e:

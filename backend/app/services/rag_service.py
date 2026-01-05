@@ -1,11 +1,11 @@
-from llama_index.core import VectorStoreIndex, StorageContext, Settings
+from llama_index.core import VectorStoreIndex, StorageContext, Settings, Document
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 from llama_index.embeddings.gemini import GeminiEmbedding
 from llama_index.llms.gemini import Gemini
 from llama_index.core.node_parser import SentenceSplitter
 from pinecone import Pinecone, ServerlessSpec
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict
 from app.core.config import get_settings
 import time
 import re
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 class RAGService:
-    """Service for RAG operations using LlamaIndex and Pinecone"""
+    """Service for RAG operations using LlamaIndex and Pinecone with CAD integration"""
     
     def __init__(self):
         self.settings = settings
@@ -76,11 +76,10 @@ class RAGService:
                 api_key=self.settings.GOOGLE_API_KEY
             )
             
-            # Use higher temperature for more natural responses
             self.llm = Gemini(
                 model_name=self.settings.LLM_MODEL,
                 api_key=self.settings.GOOGLE_API_KEY,
-                temperature=0.8  # Increased for more engaging responses
+                temperature=0.8
             )
             
             Settings.embed_model = self.embed_model
@@ -135,187 +134,254 @@ class RAGService:
             logger.exception("Full traceback:")
             raise
     
-    def _clean_mermaid_code(self, text: str) -> Optional[str]:
-        """Extract and clean Mermaid code from response"""
+    def index_cad_analysis(self, doc_id: str, analysis_results: Dict, doc_name: str) -> bool:
+        """
+        Index CAD vision analysis results into the unified RAG system
+        
+        Args:
+            doc_id: Document ID
+            analysis_results: Results from comprehensive_analysis()
+            doc_name: Original document name
+            
+        Returns:
+            True if successful
+        """
         try:
-            if "MERMAID_START" in text and "MERMAID_END" in text:
-                parts = text.split("MERMAID_START")
-                if len(parts) > 1:
-                    mermaid_part = parts[1].split("MERMAID_END")[0]
-                    code = mermaid_part.strip()
-                    
-                    code = re.sub(r'```mermaid\n?', '', code)
-                    code = re.sub(r'```\n?', '', code)
-                    code = code.strip()
-                    
-                    if not code.startswith(('graph', 'flowchart')):
-                        code = 'graph TD\n' + code
-                    
-                    code = code.replace('"', "'")
-                    
-                    logger.info(f"Cleaned Mermaid code:\n{code}")
-                    return code
+            logger.info(f"🔧 Indexing CAD analysis for {doc_name} (doc_id: {doc_id})")
             
-            return None
-        except Exception as e:
-            logger.error(f"Error cleaning Mermaid code: {e}")
-            return None
-    
-    def query(
-        self, 
-        query_text: str, 
-        doc_ids: Optional[List[str]] = None,
-        return_mindmap: bool = False
-    ) -> dict:
-        """Query the RAG system"""
-        try:
-            logger.info(f"Querying: {query_text}")
-            logger.info(f"Document IDs for filtering: {doc_ids}")
+            # Create Document objects for each stage
+            stage_documents = []
             
-            index = VectorStoreIndex.from_vector_store(
-                vector_store=self.vector_store
-            )
+            # Stage 1: Document Identification
+            if 'stage_1_identification' in analysis_results:
+                doc1 = Document(
+                    text=f"CAD DOCUMENT IDENTIFICATION - {doc_name}\n\n{analysis_results['stage_1_identification']}",
+                    metadata={
+                        'doc_id': doc_id,
+                        'file_name': doc_name,
+                        'file_type': 'cad',
+                        'source_type': 'cad_analysis',
+                        'analysis_stage': 'identification',
+                        'model_used': analysis_results.get('model_used', 'unknown')
+                    }
+                )
+                stage_documents.append(doc1)
             
-            should_mindmap = return_mindmap or self._should_generate_mindmap(query_text)
+            # Stage 2: System Overview
+            if 'stage_2_system_overview' in analysis_results:
+                doc2 = Document(
+                    text=f"CAD SYSTEM OVERVIEW - {doc_name}\n\n{analysis_results['stage_2_system_overview']}",
+                    metadata={
+                        'doc_id': doc_id,
+                        'file_name': doc_name,
+                        'file_type': 'cad',
+                        'source_type': 'cad_analysis',
+                        'analysis_stage': 'system_overview',
+                        'model_used': analysis_results.get('model_used', 'unknown')
+                    }
+                )
+                stage_documents.append(doc2)
             
-            # Build query engine - simplified without filtering
-            query_engine = index.as_query_engine(
-                similarity_top_k=self.settings.TOP_K,
-                response_mode="tree_summarize"
-            )
+            # Stage 3: Components
+            if 'stage_3_components' in analysis_results:
+                doc3 = Document(
+                    text=f"CAD COMPONENT BREAKDOWN - {doc_name}\n\n{analysis_results['stage_3_components']}",
+                    metadata={
+                        'doc_id': doc_id,
+                        'file_name': doc_name,
+                        'file_type': 'cad',
+                        'source_type': 'cad_analysis',
+                        'analysis_stage': 'components',
+                        'model_used': analysis_results.get('model_used', 'unknown')
+                    }
+                )
+                stage_documents.append(doc3)
             
-            logger.info(f"Query engine created with TOP_K={self.settings.TOP_K}")
+            # Stage 4: Technical Characteristics
+            if 'stage_4_technical' in analysis_results:
+                doc4 = Document(
+                    text=f"CAD TECHNICAL CHARACTERISTICS - {doc_name}\n\n{analysis_results['stage_4_technical']}",
+                    metadata={
+                        'doc_id': doc_id,
+                        'file_name': doc_name,
+                        'file_type': 'cad',
+                        'source_type': 'cad_analysis',
+                        'analysis_stage': 'technical',
+                        'model_used': analysis_results.get('model_used', 'unknown')
+                    }
+                )
+                stage_documents.append(doc4)
             
-            if should_mindmap:
-                mindmap_query = f"""Based on the document content, create a clear mind map about: {query_text}
+            # Stage 5: Quality Assessment
+            if 'stage_5_quality' in analysis_results:
+                doc5 = Document(
+                    text=f"CAD QUALITY & USABILITY - {doc_name}\n\n{analysis_results['stage_5_quality']}",
+                    metadata={
+                        'doc_id': doc_id,
+                        'file_name': doc_name,
+                        'file_type': 'cad',
+                        'source_type': 'cad_analysis',
+                        'analysis_stage': 'quality',
+                        'model_used': analysis_results.get('model_used', 'unknown')
+                    }
+                )
+                stage_documents.append(doc5)
+            
+            # Create complete analysis summary document
+            summary_text = f"""CAD COMPLETE ANALYSIS - {doc_name}
 
-RESPONSE FORMAT (STRICT):
-First, write 2-3 sentences explaining the topic naturally.
+Model Used: {analysis_results.get('model_used', 'Unknown')}
+Provider: {analysis_results.get('provider_used', 'Unknown')}
 
-Then write exactly: MERMAID_START
-Then write the mermaid code starting with: graph TD
-Then write exactly: MERMAID_END
+IDENTIFICATION:
+{analysis_results.get('stage_1_identification', 'N/A')}
 
-MERMAID RULES:
-- Use simple labels (3-5 words max)
-- Use single quotes only
-- No special characters in labels
-- Use clear hierarchy
-- Maximum 10 nodes
+SYSTEM OVERVIEW:
+{analysis_results.get('stage_2_system_overview', 'N/A')}
 
-Example:
-The UAV project focuses on detecting corrosion using advanced sensors.
+COMPONENTS:
+{analysis_results.get('stage_3_components', 'N/A')}
 
-MERMAID_START
-graph TD
-    A[UAV System] --> B[Hardware]
-    A --> C[Software]
-    B --> D[ZED2 Camera]
-    B --> E[LiDAR]
-    C --> F[AI Processing]
-MERMAID_END
+TECHNICAL:
+{analysis_results.get('stage_4_technical', 'N/A')}
+
+QUALITY:
+{analysis_results.get('stage_5_quality', 'N/A')}
 """
-                response = query_engine.query(mindmap_query)
+            
+            doc_summary = Document(
+                text=summary_text,
+                metadata={
+                    'doc_id': doc_id,
+                    'file_name': doc_name,
+                    'file_type': 'cad',
+                    'source_type': 'cad_analysis_summary',
+                    'analysis_stage': 'complete',
+                    'model_used': analysis_results.get('model_used', 'unknown')
+                }
+            )
+            stage_documents.append(doc_summary)
+            
+            # Index all stage documents
+            logger.info(f"Indexing {len(stage_documents)} CAD analysis documents...")
+            success = self.index_documents(stage_documents, f"{doc_id}_cad_analysis")
+            
+            if success:
+                logger.info(f"✅ CAD analysis indexed successfully for {doc_name}")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error indexing CAD analysis: {str(e)}")
+            logger.exception("Full traceback:")
+            return False
+    
+    def query(self, query_text: str, doc_ids: List[str] = None, return_mindmap: bool = False) -> dict:
+        """Query the RAG system with optional document filtering"""
+        try:
+            logger.info(f"Query: {query_text}")
+            logger.info(f"Filtering by doc_ids: {doc_ids}")
+            
+            # Create query engine with filtering
+            if doc_ids and len(doc_ids) > 0:
+                from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+                
+                filters = MetadataFilters(
+                    filters=[
+                        MetadataFilter(
+                            key="doc_id",
+                            value=doc_ids,
+                            operator=FilterOperator.IN
+                        )
+                    ]
+                )
+                
+                index = VectorStoreIndex.from_vector_store(
+                    vector_store=self.vector_store,
+                    storage_context=self.storage_context
+                )
+                
+                query_engine = index.as_query_engine(
+                    similarity_top_k=self.settings.TOP_K,
+                    filters=filters
+                )
             else:
-                
-                # IMPROVED PROMPT FOR CONCISE RESPONSES
-                full_query = f"""Answer this question directly and concisely based on the document data provided.
-
-Question: {query_text}
-
-INSTRUCTIONS:
-- Give a direct, focused answer (2-4 sentences for simple questions)
-- For CAD drawings, be specific about what you see in the data
-- If asking about visual elements, use the visual analysis data
-- If asking about text/dimensions, cite specific entities
-- Don't explain what you CAN'T see - focus on what IS in the data
-- Be technical but clear
-- If the data doesn't contain the answer, say so briefly
-
-IMPORTANT: Base your answer ONLY on the document data provided. Be concise and specific."""
-                
-                
-                logger.info(f"Sending query to LLM...")
-                response = query_engine.query(full_query)
+                index = VectorStoreIndex.from_vector_store(
+                    vector_store=self.vector_store,
+                    storage_context=self.storage_context
+                )
+                query_engine = index.as_query_engine(
+                    similarity_top_k=self.settings.TOP_K
+                )
             
-            response_text = str(response)
-            logger.info(f"Raw response length: {len(response_text)}")
-            
-            mermaid_code = self._clean_mermaid_code(response_text)
-            
-            if mermaid_code:
-                response_text = response_text.split("MERMAID_START")[0].strip()
+            # Execute query
+            response = query_engine.query(query_text)
             
             # Extract sources
             sources = []
             if hasattr(response, 'source_nodes'):
-                logger.info(f"Retrieved {len(response.source_nodes)} source nodes")
-                sources = [
-                    node.metadata.get('file_name', 'Unknown')
-                    for node in response.source_nodes
-                ]
+                for node in response.source_nodes:
+                    source_info = {
+                        'text': node.node.text[:200] + "..." if len(node.node.text) > 200 else node.node.text,
+                        'score': float(node.score) if hasattr(node, 'score') else 0.0,
+                        'metadata': node.node.metadata if hasattr(node.node, 'metadata') else {}
+                    }
+                    sources.append(source_info)
             
-            logger.info(f"Query completed. Response length: {len(response_text)}, Has mindmap: {mermaid_code is not None}")
+            # Check if mind map requested
+            has_mindmap = False
+            mermaid_code = None
             
-            # Check for too-short responses
-            if len(response_text) < 50 and not mermaid_code:
-                logger.warning(f"Response too short ({len(response_text)} chars)")
-                response_text = "I apologize, but I'm having trouble generating a proper response. This could be due to API limitations or the query not matching the document content well. Could you try rephrasing your question or asking something more specific about the document?"
-            
-            return {
-                "response": response_text,
-                "has_mindmap": mermaid_code is not None,
-                "mermaid_code": mermaid_code,
-                "sources": list(set(sources))
-            }
-            
-        except Exception as e:
-            logger.error(f"Error querying RAG system: {str(e)}")
-            logger.exception("Full traceback:")
-            
-            # Better error messages
-            error_msg = str(e)
-            if "500" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
-                response_text = "⚠️ I've hit the API rate limit. Please wait a minute and try again. If this persists, you may need to check your Gemini API quota at https://aistudio.google.com/app/apikey"
+            if return_mindmap:
+                has_mindmap, mermaid_code = self._extract_mindmap(str(response))
             else:
-                response_text = f"I encountered an error: {error_msg}. Please try again with a different question."
+                has_mindmap, mermaid_code = self._check_for_mindmap(query_text, str(response))
             
             return {
-                "response": response_text,
-                "has_mindmap": False,
-                "mermaid_code": None,
-                "sources": []
+                "response": str(response),
+                "sources": sources,
+                "has_mindmap": has_mindmap,
+                "mermaid_code": mermaid_code
             }
-    
-    def _should_generate_mindmap(self, query: str) -> bool:
-        """Determine if query is asking for a mind map"""
-        mindmap_keywords = [
-            'mind map', 'mindmap', 'diagram', 'structure', 
-            'visualize', 'visualization', 'chart', 'graph',
-            'relationship', 'overview', 'flow', 'map out'
-        ]
-        query_lower = query.lower()
-        return any(keyword in query_lower for keyword in mindmap_keywords)
-    
-    def delete_document(self, doc_id: str) -> bool:
-        """Delete document from vector store"""
-        try:
-            logger.info(f"Deleting document from Pinecone: {doc_id}")
             
-            # Delete all vectors with this doc_id
-            self.pinecone_index.delete(filter={"doc_id": doc_id})
-            
-            logger.info(f"Successfully deleted document: {doc_id}")
-            return True
         except Exception as e:
-            logger.error(f"Error deleting document from vector store: {str(e)}")
-            return False
+            logger.error(f"Error in query: {str(e)}")
+            logger.exception("Full traceback:")
+            raise
+    
+    def _check_for_mindmap(self, query: str, response: str) -> tuple:
+        """Check if response contains or should contain a mind map"""
+        mindmap_keywords = ['mind map', 'mindmap', 'diagram', 'visualize', 'flowchart', 'structure']
+        
+        query_lower = query.lower()
+        if any(keyword in query_lower for keyword in mindmap_keywords):
+            has_mindmap, code = self._extract_mindmap(response)
+            return has_mindmap, code
+        
+        return False, None
+    
+    def _extract_mindmap(self, response: str) -> tuple:
+        """Extract Mermaid code from response"""
+        import re
+        
+        patterns = [
+            r'```mermaid\n(.*?)\n```',
+            r'```\n(graph .*?)\n```',
+            r'(graph (?:TB|TD|LR|RL)\n.*?)(?:\n\n|$)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, response, re.DOTALL)
+            if match:
+                return True, match.group(1).strip()
+        
+        return False, None
 
-rag_service = None
+_rag_service_instance = None
 
-def get_rag_service():
-    global rag_service
-    if rag_service is None:
-        logger.info("Creating RAG service instance...")
-        rag_service = RAGService()
-    return rag_service
+def get_rag_service() -> RAGService:
+    """Get singleton RAG service instance"""
+    global _rag_service_instance
+    if _rag_service_instance is None:
+        _rag_service_instance = RAGService()
+    return _rag_service_instance
