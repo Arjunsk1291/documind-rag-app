@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: documind-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r backend/requirements.txt
+      cd frontend
+      npm install
+      npm run build
+    startCommand: "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    autoDeploy: true
+    
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10"
+      - key:  GOOGLE_API_KEY
+        fromDatabase: true
+      - key:  PINECONE_API_KEY
+        fromDatabase: true
+      - key: OPENROUTER_API_KEY
+        fromDatabase: true
+      - key: PINECONE_INDEX_NAME
+        value: "documind-index"
+      - key: LLM_MODEL
+        value:  "models/gemini-flash-latest"
+      - key:  EMBEDDING_MODEL
+        value: "models/text-embedding-004"
+      - key: CHUNK_SIZE
+        value: "1024"
+      - key: CHUNK_OVERLAP
+        value: "200"
+      - key: TOP_K
+        value: "8"
+      - key: UPLOAD_DIR
+        value: "uploads"
+
+  - type: web
+    name: documind-frontend
+    env: static
+    region: oregon
+    plan: free
+    staticPublishPath: dist
+    buildCommand:  "cd frontend && npm install && npm run build"
+    routes:
+      - path: /
+        destination: /index.html
